@@ -131,7 +131,7 @@ export default function DashboardClient({ session }: { session: any }) {
               )}
               <div className={styles.taskContent}>
                 {item.public ? (
-                  <Link href={`/tasks/${item.id}`}>
+                  <Link href={`/task/${item.id}`}>
                     <p>{item.tarefa}</p>
                   </Link>
                 ) : (
