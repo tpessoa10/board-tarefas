@@ -5,25 +5,30 @@ import Head from "next/head";
 import styles from './style.module.css'
 import { GetServerSideProps } from "next";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import { addDoc, collection, query, orderBy, where, onSnapshot, doc, deleteDoc, getDoc } from 'firebase/firestore';
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { addDoc, collection, query, orderBy, where, onSnapshot, doc, deleteDoc, getDoc, getDocs } from 'firebase/firestore';
 import { db } from '@/services/firebaseConnection';
-import {useRouter} from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { Textarea } from "@/components/textarea";
+import { useSession } from "next-auth/react";
+import { FaTrash } from 'react-icons/fa'
 
 
 
-interface Task{
-    create:string
-    public:boolean
-    tarefa:string
-    user:string
-    id:string
+interface Task {
+    create: string
+    public: boolean
+    tarefa: string
+    user: string
+    id: string
 
 }
 
 export default function Task() {
+    const { data: session } = useSession()
+    const [input, setInput] = useState("")
     const [task, setTask] = useState<Task>()
+    const [comments, setComments] = useState<any[]>([])
     const params = useParams()
     const router = useRouter()
     const id = params!.id as string;
@@ -33,11 +38,11 @@ export default function Task() {
         const docRef = doc(db, "tarefas", id);
         const snap = await getDoc(docRef);
 
-        if(snap.data() === undefined){
+        if (snap.data() === undefined) {
             router.push("/")
         }
 
-        if(snap.data()?.public === false){
+        if (snap.data()?.public === false) {
             router.push("/")
         }
 
@@ -46,7 +51,7 @@ export default function Task() {
 
         console.log('snao', snap.data())
         const miliseconds = snap.data()?.create.seconds * 1000
-        const task:Task = {
+        const task: Task = {
             create: new Date(miliseconds).toLocaleDateString(),
             public: snap.data()?.public,
             tarefa: snap.data()?.tarefa,
@@ -56,8 +61,64 @@ export default function Task() {
         setTask(task)
     }
 
+    async function handleComment(event: FormEvent) {
+        event.preventDefault()
+
+        if (input === "") return
+
+        if (!session?.user?.email || !session?.user?.name) return
+
+        try {
+            const docRef = await addDoc(collection(db, "comments"), {
+                comment: input,
+                create: new Date(),
+                user: session?.user?.email,
+                name: session?.user?.name,
+                taskId: id
+            })
+
+            const newComment = {
+                id: docRef.id,
+                 comment: input,
+                create: new Date(),
+                user: session?.user?.email,
+                name: session?.user?.name,
+                taskId: id
+            }
+            setComments((prevComments) => [...prevComments, newComment])
+            setInput("")
+        } catch (e) {
+            console.log(e)
+        }
+
+        console.log('foi')
+    }
+
+    async function getComments() {
+        const q = query(
+            collection(db, "comments"),
+            where("taskId", "==", id),
+            orderBy("create", "desc")
+        )
+
+        const snapshot = await getDocs(q)
+        const list: any[] = []
+
+        snapshot.forEach(doc => {
+            list.push({
+                id: doc.id,
+                ...doc.data()
+            })
+        })
+
+        setComments(list)
+    }
+
+    console.log('comments ', comments)
+
     useEffect(() => {
         getTaskById(id)
+        getComments()
     }, [])
 
     return (
@@ -75,10 +136,30 @@ export default function Task() {
 
             <section className={styles.commentsContainer}>
                 <h2>Deixar Comentário</h2>
-                <form action="">
-                    <Textarea/>
-                    <button className={styles.button}>Enviar Comentário</button>
+                <form onSubmit={handleComment}>
+                    <Textarea value={input} onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value)} />
+                    <button disabled={!session?.user} className={styles.button}>Enviar Comentário</button>
                 </form>
+            </section>
+            <section className={styles.commentsContainer}>
+                <h2>Todos os comentários</h2>
+                {comments.length === 0 && (
+                    <span>Nenhum comentário foi encontrado</span>
+                )}
+                {comments.map((item) => (
+                    <article key={item.id} className={styles.comment}>
+                        <div className={styles.headComment}>
+                            <label className={styles.commentsLabel}>{item.name}</label>
+                            {item.user === session?.user?.email ?
+                                (
+                                    <button className={styles.buttonTrash}>
+                                        <FaTrash size={18} color="#EA3140" />
+                                    </button>
+                                ) : ''}
+                        </div>
+                        <p>{item.comment}</p>
+                    </article>
+                ))}
             </section>
         </div>
     )
