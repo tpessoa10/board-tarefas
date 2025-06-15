@@ -79,7 +79,7 @@ export default function Task() {
 
             const newComment = {
                 id: docRef.id,
-                 comment: input,
+                comment: input,
                 create: new Date(),
                 user: session?.user?.email,
                 name: session?.user?.name,
@@ -114,7 +114,17 @@ export default function Task() {
         setComments(list)
     }
 
-    console.log('comments ', comments)
+    async function handleDeleteComment(id:string) {
+        try{
+            const docRef = doc(db, "comments", id)
+            await deleteDoc(docRef)
+
+            const deleteComment = comments.filter((item) => item.id !== id)
+            setComments(deleteComment)
+        } catch(e){
+            console.log(e)
+        }
+    }
 
     useEffect(() => {
         getTaskById(id)
@@ -153,7 +163,7 @@ export default function Task() {
                             {item.user === session?.user?.email ?
                                 (
                                     <button className={styles.buttonTrash}>
-                                        <FaTrash size={18} color="#EA3140" />
+                                        <FaTrash size={18} color="#EA3140" onClick={() => handleDeleteComment(item.id)}/>
                                     </button>
                                 ) : ''}
                         </div>
